@@ -6,9 +6,11 @@ Construido con **Next.js 15 (Pages Router) + TypeScript**, ejecuta de forma
 independiente en `http://localhost:3001` y será consumido posteriormente por
 `nutria-shell` (HOST / Orquestador) mediante Module Federation.
 
-> **Estado actual (HU-06):** el Remote funciona de manera independiente.
-> Todavía **no existe integración con `nutria-shell`** ni **módulo federado
-> expuesto**. Module Federation se configurará en una HU posterior.
+> **Estado actual (HU-07):** el Remote es un contenedor de Module Federation
+> funcional. Genera y sirve `remoteEntry.js` y ya puede ser consumido por un Host.
+> Todavía **no existe integración con `nutria-shell`** ni **lógica de negocio de
+> Afiliados**: el único módulo expuesto es un contrato de información mínimo
+> (`./info`) que se reemplazará por el módulo real en HU-08.
 
 ---
 
@@ -69,7 +71,8 @@ Este repositorio es **totalmente independiente de `nutria-shell`**:
 | TypeScript        | ^5                                   |
 | Gestor de paquetes| pnpm                                 |
 | Estilos           | CSS puro (CSS Modules y `globals.css`) |
-| Bundler           | Webpack (incluido en Next.js 15)     |
+| Bundler           | Webpack 5.105.0 (local, ver §8)      |
+| Module Federation | `@module-federation/nextjs-mf` 8.8.76 |
 
 Consideraciones importantes:
 
@@ -124,6 +127,9 @@ pnpm start
 | `pnpm start`      | Sirve la build de producción en el puerto 3001      |
 | `pnpm typecheck`  | Verificación de tipos con `tsc --noEmit`           |
 
+Los scripts `dev`, `build` y `start` usan `cross-env` para fijar
+`NEXT_PRIVATE_LOCAL_WEBPACK=true` (ver §8).
+
 ---
 
 ## 6. Estructura del proyecto
@@ -136,6 +142,9 @@ nutria-mfe-afiliados/
 │   ├── _document.tsx     # Documento HTML
 │   └── index.tsx         # Página inicial del Remote
 │
+├── federation/
+│   └── remote-info.ts    # Contrato mínimo expuesto (./info), sin lógica de negocio
+│
 ├── public/
 │   └── favicon.ico
 │
@@ -144,8 +153,9 @@ nutria-mfe-afiliados/
 │
 ├── package.json
 ├── pnpm-lock.yaml
+├── pnpm-workspace.yaml   # Ajustes de pnpm (buildscripts + override), NO es monorepo
 ├── tsconfig.json
-├── next.config.ts
+├── next.config.ts        # Configuración de Next.js + NextFederationPlugin
 ├── .gitignore
 └── README.md
 ```
@@ -154,8 +164,11 @@ Notas:
 
 - `next.config.ts` usa configuración tipada de Next.js
   (`import type { NextConfig }`).
-- El bundler es **Webpack**, que Next.js 15 ya incluye. No es necesario instalar
-  `webpack` por separado.
+- `pnpm-workspace.yaml` **no declara `packages`**: no es un monorepo. Solo fija
+  `allowBuilds` (bloquea el `postinstall` de terceros) y un `override` de
+  `enhanced-resolve` necesario por compatibilidad (ver §8).
+- `webpack` se instala como `devDependency` porque Module Federation necesita los
+  internos de Webpack, que la copia compilada de Next.js no expone.
 
 ---
 
@@ -171,12 +184,20 @@ Notas:
 - [x] Página inicial mínima que identifica **NUTRIA / Afiliados / REMOTE**.
 - [x] Verificación de tipos y build de producción exitosos.
 
+**Implementado en HU-07:**
+
+- [x] `@module-federation/nextjs-mf` instalado y configurado.
+- [x] `NextFederationPlugin` registrado en `next.config.ts`.
+- [x] Contenedor federado con nombre **`nutria_mfe_afiliados`**.
+- [x] `remoteEntry.js` generado en build y servido correctamente.
+- [x] `exposes` limitado a `./info` (contrato mínimo, **sin lógica de negocio**).
+- [x] `shared` por defecto (react, react-dom, styled-jsx e internos de Next).
+- [x] Build, typecheck, `dev` y `start` verificados.
+
 **Todavía NO implementado:**
 
-- [ ] Configuración de Module Federation (`NextFederationPlugin`).
-- [ ] `exposes` / `remoteEntry`.
 - [ ] `remotes` en el Host.
-- [ ] Módulo federado expuesto.
+- [ ] Módulo federado real del dominio de Afiliados.
 - [ ] Conexión o consumo desde `nutria-shell`.
 - [ ] Funcionalidades reales de Afiliados.
 - [ ] Backend, APIs o autenticación.
@@ -185,55 +206,147 @@ Notas:
 
 ## 8. Module Federation
 
-En esta HU **no** se implementó Module Federation. Esa configuración corresponde
-a una HU posterior.
-
-El proyecto quedó preparado para configurar
-[`@module-federation/nextjs-mf`](https://module-federation.io/) como Remote:
-
-- **Pages Router** en lugar de App Router (requisito de la integración).
-- `next.config.ts` en formato TypeScript.
-- Webpack como bundler.
-
-Concepto a implementar en la HU siguiente:
+El proyecto está configurado como **Remote** (contenedor federado) con
+[`@module-federation/nextjs-mf`](https://module-federation.io/):
 
 ```
-REMOTE (este proyecto)
+REMOTE  nutria-mfe-afiliados  (http://localhost:3001)
+   │
+   ├── remoteEntry.js  →  punto de entrada del contenedor
    │
    ├── exposes
+   │      └── ./info   →  federation/remote-info.ts  (contrato mínimo)
    │
-   ▼
-módulo de Afiliados
+   ├── shared (por defecto)
+   │      react, react-dom, styled-jsx e internos de Next
    │
+   └── remotes: {}     →  este proyecto NO consume federados
    ▼
-HOST  nutria-shell
+HOST  nutria-shell  (HU-09 / HU-10)
 ```
+
+### Configuración
+
+`next.config.ts` registra el plugin sobre la configuración de Webpack que Next.js
+ya construye, sin reemplazarla:
+
+```ts
+new NextFederationPlugin({
+  name: "nutria_mfe_afiliados",
+  filename: "static/chunks/remoteEntry.js",
+  exposes: { "./info": "./federation/remote-info.ts" },
+  extraOptions: { debug: false },
+});
+```
+
+Decisiones relevantes:
+
+- **`name: "nutria_mfe_afiliados"`** es el identificador estable con el que un
+  Host consumirá este Remote.
+- **`filename: "static/chunks/remoteEntry.js"`** coloca la entry dentro de
+  `static/`, que Next.js sirve como estático con hash estable. La alternativa
+  `remoteEntry.js` a secas emitiría en `.next/remoteEntry.js`, una ruta que Next
+  **no** expone por HTTP.
+- **`exposes` contiene únicamente `./info`.** No se expone ningún módulo de
+  negocio: el dominio de Afiliados se expone en HU-08.MF necesita al menos un
+  expose para emitir el chunk del contenedor; con un mapa `exposes` vacío
+  webpack lo descarta por estar vacío y **no** se genera `remoteEntry.js`. Por eso
+  `federation/remote-info.ts` expone un contrato mínimo (`name`, `version`).
+- **`shared` no se declara**: `NextFederationPlugin` ya comparte por defecto react,
+  react-dom, styled-jsx y los internos de Next.
+- **`remotes` no se declara**: este proyecto es solo un Remote.
+
+### Artefactos generados
+
+`pnpm build` produce cuatro copias de la entry:
+
+| Artefacto                                  | Ámbito                |
+| ------------------------------------------ | --------------------- |
+| `.next/static/chunks/remoteEntry.js`       | cliente (se sirve)    |
+| `.next/server/chunks/remoteEntry.js`       | servidor (SSR)        |
+| `.next/ssr/remoteEntry.js`                 | copia para `ssr`      |
+| `.next/static/ssr/remoteEntry.js`          | copia estática        |
+
+Junto a ellos se emiten `mf-manifest.json`, `mf-stats.json` y
+`federated-stats.json` en `.next/static/chunks/`.
+
+El contenedor se registra en el navegador como variable global
+`window.nutria_mfe_afiliados`, que expone los métodos `get` / `init`.
+
+### Verificación
+
+```bash
+pnpm build
+pnpm start
+```
+
+```bash
+curl http://localhost:3001/                                    # 200
+curl http://localhost:3001/_next/static/chunks/remoteEntry.js   # 200
+```
+
+URL que usará el Host:
+
+```
+http://localhost:3001/_next/static/chunks/remoteEntry.js
+```
+
+### Requisitos de build
+
+Module Federation necesita la **copia local de Webpack**, porque usa internos que
+la copia compilada de Next.js no expone. Por eso los scripts fijan:
+
+```bash
+NEXT_PRIVATE_LOCAL_WEBPACK=true
+```
+
+mediante `cross-env`, y `webpack` figura como `devDependency`.
+
+**Pin de compatibilidad.** Webpack y `enhanced-resolve` están fijados a versiones
+concretas por un problema real con Next.js 15.5.26:
+
+- `webpack@5.105.0` es la última versión que expone `RuntimeTemplate.renderConst`,
+  requerido por el `experiments.asyncStartup` que activa el plugin.
+- Webpack ≥ 5.110 requiere `enhanced-resolve@^5.25`, y desde `enhanced-resolve`
+  5.21 el campo `resolveContext.stack` dejó de ser un `Set` para convertirse en
+  una lista enlazada sin método `delete`. El plugin interno
+  `OptionalPeerDependencyResolverPlugin` de Next 15.5.26 llama
+  `resolveContext.stack?.delete(...)` y falla con
+  `TypeError: _resolveContext_stack.delete is not a function`.
+- El `override` a `enhanced-resolve@5.20.1` (última versión con `stack` basado en
+  `Set`, y dentro del rango `^5.19.0` que declara Webpack 5.105.0) resuelve el
+  conflicto **sin degradar Next.js ni cambiar de arquitectura**.
+
+> `@module-federation/nextjs-mf` advierte que el soporte de Next.js será
+> deprecado. La configuración se mantiene porque es el paquete requerido para esta
+> integración.
 
 ---
 
 ## 9. Relación con nutria-shell
 
-En esta HU **no existe integración con `nutria-shell`**. La conexión todavía no
-existe:
+En esta HU **sigue sin existir integración activa con `nutria-shell`**: este
+proyecto no lo modifica ni lo invoca. Lo que cambia es que el Remote **ya está
+preparado para ser consumido**:
 
 ```
 nutria-shell
-     │
-     X
-     │
-nutria-mfe-afiliados
+      │
+      X   ← la conexión se hará en HU-10
+      │
+nutria-mfe-afiliados   (contenedor federado listo)
 ```
 
-Por ahora ambos proyectos se ejecutan **de forma independiente**:
+Ambos proyectos se ejecutan **de forma independiente**:
 
 | Proyecto               | Rol                 | Puerto          |
 | ---------------------- | ------------------- | --------------- |
 | `nutria-shell`         | HOST / Orquestador  | (puerto propio) |
 | `nutria-mfe-afiliados` | REMOTE              | 3001            |
 
-La composición entre ambos se resolverá posteriormente mediante Module
-Federation. La comunicación con backend (REST/HTTP) es un mecanismo diferente y
-complementario, y no se implementa en esta etapa.
+La composición entre ambos se resolverá en HU-10 mediante Module Federation. La
+comunicación con backend (REST/HTTP) es un mecanismo diferente y complementario, y
+no se implementa en esta etapa.
 
 ---
 
@@ -252,7 +365,7 @@ ni lógica de negocio. Estos elementos se definirán en HUs posteriores.
 | HU     | Contenido                                                  | Estado      |
 | ------ | ---------------------------------------------------------- | ----------- |
 | HU-06  | Inicializar el Remote de forma independiente              | Completada  |
-| HU-07  | Configurar Module Federation                               | Pendiente   |
+| HU-07  | Configurar Module Federation                               | Completada  |
 | HU-08  | Exponer el primer módulo                                   | Pendiente   |
 | HU-09  | Configurar el Host                                         | Pendiente   |
 | HU-10  | Consumir el módulo desde `nutria-shell`                    | Pendiente   |

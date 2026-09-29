@@ -4,12 +4,13 @@
   "private": true,
   "description": "NUTRIA - Microfrontend Remote del dominio Afiliados",
   "scripts": {
-    "dev": "next dev -p 3001",
-    "build": "next build",
-    "start": "next start -p 3001",
+    "dev": "cross-env NEXT_PRIVATE_LOCAL_WEBPACK=true next dev -p 3001",
+    "build": "cross-env NEXT_PRIVATE_LOCAL_WEBPACK=true next build",
+    "start": "cross-env NEXT_PRIVATE_LOCAL_WEBPACK=true next start -p 3001",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@module-federation/nextjs-mf": "^8.8.76",
     "next": "15.5.26",
     "react": "19.1.0",
     "react-dom": "19.1.0"
@@ -18,6 +19,8 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "typescript": "^5"
+    "cross-env": "^10.1.0",
+    "typescript": "^5",
+    "webpack": "5.105.0"
   }
 }

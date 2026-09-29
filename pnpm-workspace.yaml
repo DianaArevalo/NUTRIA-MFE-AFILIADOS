@@ -1,0 +1,23 @@
+# Configuración de pnpm a nivel de proyecto (pnpm >= 10 la lee aquí,
+# no en el campo "pnpm" de package.json).
+#
+# allowBuilds:
+#   - true  -> se permite el script de instalación del paquete
+#   - false -> se bloquea (valor por defecto de pnpm 10+)
+#
+# El postinstall de @module-federation/nextjs-mf es únicamente un `echo` con un
+# aviso de deprecación del paquete. No realiza ninguna acción funcional, por lo
+# que se bloquea explícitamente: no es necesario ejecutar scripts de terceros.
+allowBuilds:
+  '@module-federation/nextjs-mf': false
+
+# Next.js 15.5.26 usa internamente `resolveContext.stack?.delete(...)`
+# (plugin OptionalPeerDependencyResolverPlugin), assumiendo que ese valor es un
+# Set. Desde enhanced-resolve 5.21.0 ese `stack` paso a ser una lista enlazada
+# (`StackEntry`) sin metodo `delete`, lo que rompe `next build` cuando se usa un
+# Webpack local (`NEXT_PRIVATE_LOCAL_WEBPACK=true`).
+#
+# 5.20.1 es la ultima version con `stack` basado en Set.
+# Es compatible con el rango que declara webpack@5.105.0 (^5.19.0).
+overrides:
+  enhanced-resolve: 5.20.1
