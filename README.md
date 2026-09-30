@@ -6,11 +6,11 @@ Construido con **Next.js 15 (Pages Router) + TypeScript**, ejecuta de forma
 independiente en `http://localhost:3001` y será consumido posteriormente por
 `nutria-shell` (HOST / Orquestador) mediante Module Federation.
 
-> **Estado actual (HU-07):** el Remote es un contenedor de Module Federation
-> funcional. Genera y sirve `remoteEntry.js` y ya puede ser consumido por un Host.
-> Todavía **no existe integración con `nutria-shell`** ni **lógica de negocio de
-> Afiliados**: el único módulo expuesto es un contrato de información mínimo
-> (`./info`) que se reemplazará por el módulo real en HU-08.
+> **Estado actual (HU-08):** el Remote es un contenedor de Module Federation
+> funcional que ya expone el **primer módulo real del dominio de Afiliados** como
+> `./Afiliados`. Genera y sirve `remoteEntry.js` y está listo para ser consumido por
+> un Host. Todavía **no existe integración con `nutria-shell`** ni **lógica de
+> negocio de Afiliados**: el módulo es una demostración visual con estilos propios.
 
 ---
 
@@ -137,19 +137,21 @@ Los scripts `dev`, `build` y `start` usan `cross-env` para fijar
 ```
 nutria-mfe-afiliados/
 │
+├── components/
+│   └── affiliates/
+│       ├── AffiliatesModule.tsx         # Módulo federado de Afiliados (expose "./Afiliados")
+│       └── AffiliatesModule.module.css  # Estilos del módulo (CSS Module)
+│
 ├── pages/
 │   ├── _app.tsx          # App global (carga estilos)
 │   ├── _document.tsx     # Documento HTML
-│   └── index.tsx         # Página inicial del Remote
-│
-├── federation/
-│   └── remote-info.ts    # Contrato mínimo expuesto (./info), sin lógica de negocio
+│   └── index.tsx         # Página local del Remote (reutiliza AffiliatesModule)
 │
 ├── public/
 │   └── favicon.ico
 │
 ├── styles/
-│   └── globals.css       # Estilos globales (CSS)
+│   └── globals.css       # Estilos globales (CSS) y tokens de NUTRIA
 │
 ├── package.json
 ├── pnpm-lock.yaml
@@ -169,6 +171,13 @@ Notas:
   `enhanced-resolve` necesario por compatibilidad (ver §8).
 - `webpack` se instala como `devDependency` porque Module Federation necesita los
   internos de Webpack, que la copia compilada de Next.js no expone.
+- **El módulo federado tiene una sola implementación**: `AffiliatesModule.tsx` es a
+  la vez lo que se expone por Module Federation y lo que renderiza `pages/index.tsx`
+  en el puerto 3001. `pages/index.tsx` no mantiene una segunda versión de la vista.
+- Los estilos del módulo viven en un **CSS Module**, no en `styles/globals.css`, con
+  valores de reserva (`var(--nutria-*, fallback)`) para que el componente se vea
+  igual dentro del Remote o consumido desde un Host que no defina los tokens de
+  NUTRIA.
 
 ---
 
@@ -194,12 +203,26 @@ Notas:
 - [x] `shared` por defecto (react, react-dom, styled-jsx e internos de Next).
 - [x] Build, typecheck, `dev` y `start` verificados.
 
+**Implementado en HU-08:**
+
+- [x] Componente reutilizable `AffiliatesModule.tsx` creado en
+  `components/affiliates/`.
+- [x] Estilos del módulo en `AffiliatesModule.module.css` (CSS Module con
+      valores de reserva para los tokens de NUTRIA).
+- [x] Expose técnico `./info` **reemplazado** por el módulo real `./Afiliados`.
+- [x] `exposes` apunta al componente real
+      (`./Afiliados` → `./components/affiliates/AffiliatesModule.tsx`).
+- [x] `federation/remote-info.ts` **eliminado** (ya no es necesario).
+- [x] `pages/index.tsx` reutiliza el mismo componente federado, sin duplicar vista.
+- [x] Clases que quedaron obsoletas en `styles/globals.css` retiradas.
+- [x] El Remote sigue funcionando de forma independiente en el puerto `3001`.
+- [x] Generación de `remoteEntry.js` verificada en build con el nuevo expose.
+
 **Todavía NO implementado:**
 
 - [ ] `remotes` en el Host.
-- [ ] Módulo federado real del dominio de Afiliados.
 - [ ] Conexión o consumo desde `nutria-shell`.
-- [ ] Funcionalidades reales de Afiliados.
+- [ ] Lógica de negocio y funcionalidades reales de Afiliados.
 - [ ] Backend, APIs o autenticación.
 
 ---
@@ -215,7 +238,7 @@ REMOTE  nutria-mfe-afiliados  (http://localhost:3001)
    ├── remoteEntry.js  →  punto de entrada del contenedor
    │
    ├── exposes
-   │      └── ./info   →  federation/remote-info.ts  (contrato mínimo)
+   │      └── ./Afiliados  →  components/affiliates/AffiliatesModule.tsx
    │
    ├── shared (por defecto)
    │      react, react-dom, styled-jsx e internos de Next
@@ -234,7 +257,7 @@ ya construye, sin reemplazarla:
 new NextFederationPlugin({
   name: "nutria_mfe_afiliados",
   filename: "static/chunks/remoteEntry.js",
-  exposes: { "./info": "./federation/remote-info.ts" },
+  exposes: { "./Afiliados": "./components/affiliates/AffiliatesModule.tsx" },
   extraOptions: { debug: false },
 });
 ```
@@ -247,14 +270,48 @@ Decisiones relevantes:
   `static/`, que Next.js sirve como estático con hash estable. La alternativa
   `remoteEntry.js` a secas emitiría en `.next/remoteEntry.js`, una ruta que Next
   **no** expone por HTTP.
-- **`exposes` contiene únicamente `./info`.** No se expone ningún módulo de
-  negocio: el dominio de Afiliados se expone en HU-08.MF necesita al menos un
-  expose para emitir el chunk del contenedor; con un mapa `exposes` vacío
-  webpack lo descarta por estar vacío y **no** se genera `remoteEntry.js`. Por eso
-  `federation/remote-info.ts` expone un contrato mínimo (`name`, `version`).
+- **`exposes` contiene únicamente `./Afiliados`**, el módulo real del dominio
+  (HU-08). Antes exponía `./info`, un contrato técnico mínimo (`name`, `version`)
+  que existía solo porque **MF necesita al menos un expose para emitir el chunk del
+  contenedor**: con un mapa `exposes` vacío webpack lo descarta por estar vacío y
+  **no** se genera `remoteEntry.js`. Ese contrato se eliminó en HU-08 al sustituirlo
+  por el módulo real.
+- **El módulo se expone como `default` export.** `AffiliatesModule.tsx` declara
+  `export default function AffiliatesModule(...)`, por lo que un Host lo consume
+  con `dynamic(() => import("nutria_mfe_afiliados/Afiliados"))` sin necesidad de
+  mapear nombres ni acotar el import.
 - **`shared` no se declara**: `NextFederationPlugin` ya comparte por defecto react,
   react-dom, styled-jsx y los internos de Next.
 - **`remotes` no se declara**: este proyecto es solo un Remote.
+
+### Contrato del módulo expuesto
+
+`components/affiliates/AffiliatesModule.tsx` exporta:
+
+| Export                     | Tipo / Valor                                       | Descripción                                     |
+| -------------------------- | -------------------------------------------------- | ----------------------------------------------- |
+| `default`                  | `AffiliatesModule` (componente React)              | Componente a renderizar                         |
+| `REMOTE_NAME`              | `"nutria_mfe_afiliados"`                           | Nombre del Remote que publica el módulo         |
+| `MODULE_ID`                | `"./Afiliados"`                                    | Identificador del módulo federado                |
+| `AffiliatesModuleProps`    | `{ remoteName?: string }`                          | Prop única para identificar el Remote            |
+
+El Host lo consumirá en HU-10. El módulo expone un punto de extensión
+(`remoteName`) para que el Host pueda identificar el origen al renderizarlo, y
+publica `data-remote` / `data-module` en el DOM con el mismo fin.
+
+### Estilos del módulo
+
+El módulo **no depende de clases globales**. `AffiliatesModule.module.css` declara
+sus propios custom properties con valores de reserva:
+
+```css
+--afiliados-primary: var(--nutria-primary, #2f6b3f);
+```
+
+Así el componente hereda los tokens de NUTRIA cuando están disponibles (por
+ejemplo dentro del propio Remote) y mantiene una apariencia correcta cuando es
+consumido desde un Host que no los define. Al ser un **CSS Module**, sus clases se
+scopearán por hash y no colisionarán con los estilos del Host.
 
 ### Artefactos generados
 
@@ -326,8 +383,8 @@ concretas por un problema real con Next.js 15.5.26:
 ## 9. Relación con nutria-shell
 
 En esta HU **sigue sin existir integración activa con `nutria-shell`**: este
-proyecto no lo modifica ni lo invoca. Lo que cambia es que el Remote **ya está
-preparado para ser consumido**:
+proyecto no lo modifica ni lo invoca. Lo que cambia es que el Remote **ya expone
+su módulo real y está preparado para ser consumido**:
 
 ```
 nutria-shell
@@ -354,6 +411,10 @@ no se implementa en esta etapa.
 
 El Remote estará relacionado con la **gestión de los afiliados de NUTRIA**.
 
+El módulo expuesto como `./Afiliados` es la base visual del dominio: una tarjeta
+que identifica NUTRIA, el nombre del módulo y el Remote que lo publica. Es una
+**demostración visual** que valida la exposición federada de extremo a extremo.
+
 Por ahora la información funcional es mínima y conceptual. **No** se definen
 endpoints, APIs, tablas, servicios backend, modelos detallados, operaciones CRUD
 ni lógica de negocio. Estos elementos se definirán en HUs posteriores.
@@ -366,7 +427,7 @@ ni lógica de negocio. Estos elementos se definirán en HUs posteriores.
 | ------ | ---------------------------------------------------------- | ----------- |
 | HU-06  | Inicializar el Remote de forma independiente              | Completada  |
 | HU-07  | Configurar Module Federation                               | Completada  |
-| HU-08  | Exponer el primer módulo                                   | Pendiente   |
+| HU-08  | Exponer el primer módulo                                   | Completada  |
 | HU-09  | Configurar el Host                                         | Pendiente   |
 | HU-10  | Consumir el módulo desde `nutria-shell`                    | Pendiente   |
 

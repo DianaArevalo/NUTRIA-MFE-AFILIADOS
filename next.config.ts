@@ -23,11 +23,10 @@ const nextConfig: NextConfig = {
       new NextFederationPlugin({
         name: REMOTE_NAME,
         filename: REMOTE_ENTRY,
-        // `exposes` no incluye ningun modulo de negocio: el dominio de
-        // Afiliados se expone en HU-08. Se declara `./info` porque Module
-        // Federation omite `remoteEntry.js` cuando el mapa `exposes` esta vacio.
+        // Modulo real del dominio de Afiliados. Reemplaza al contrato tecnico
+        // `./info` de HU-07, que existia solo para probe tecnico.
         exposes: {
-          "./info": "./federation/remote-info.ts",
+          "./Afiliados": "./components/affiliates/AffiliatesModule.tsx",
         },
         // Este proyecto es solo un Remote: no declara `remotes` (no consume federados).
         // `shared` no se declara porque NextFederationPlugin ya comparte por defecto

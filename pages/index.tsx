@@ -1,3 +1,4 @@
+import AffiliatesModule from "@/components/affiliates/AffiliatesModule";
 import Head from "next/head";
 
 export default function Home() {
@@ -13,22 +14,12 @@ export default function Home() {
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
+      {/*
+        La pagina local del Remote reutiliza el mismo componente que Module
+        Federation expone como "./Afiliados": no hay una segunda implementacion.
+      */}
       <main className="page">
-        <section className="card">
-          <p className="brand">NUTRIA</p>
-
-          <h1 className="title">Afiliados</h1>
-
-          <p className="badge">REMOTE</p>
-
-          <p className="description">
-            Remote del dominio Afiliados.
-          </p>
-
-          <p className="status">
-            Estado: Remote independiente inicializado correctamente.
-          </p>
-        </section>
+        <AffiliatesModule />
       </main>
     </>
   );

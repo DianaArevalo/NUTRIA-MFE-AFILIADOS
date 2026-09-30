@@ -1,0 +1,125 @@
+/*
+ * Estilos del modulo de Afiliados.
+ *
+ * Se mantienen visualmente coherentes con NUTRIA reutilizando los tokens de
+ * `styles/globals.css` cuando estan disponibles y, si no (por ejemplo cuando el
+ * modulo se consume desde un Host que no define esos tokens), aplicando los
+ * valores de reserva declarados aqui. No se dependende de clases globales.
+ */
+
+.card {
+  --afiliados-surface: var(--nutria-surface, #ffffff);
+  --afiliados-background: var(--nutria-background, #f4f6f4);
+  --afiliados-primary: var(--nutria-primary, #2f6b3f);
+  --afiliados-primary-soft: var(--nutria-primary-soft, #e8f0ea);
+  --afiliados-foreground: var(--nutria-foreground, #1f2a22);
+  --afiliados-muted: var(--nutria-muted, #5c6b60);
+  --afiliados-border: var(--nutria-border, #dde4de);
+
+  width: 100%;
+  max-width: 32rem;
+  background: var(--afiliados-surface);
+  border: 1px solid var(--afiliados-border);
+  border-radius: 12px;
+  padding: 2.5rem;
+  text-align: center;
+  box-shadow: 0 1px 3px rgba(31, 42, 34, 0.06);
+  color: var(--afiliados-foreground);
+  font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+.brand {
+  font-size: 0.875rem;
+  font-weight: 700;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--afiliados-primary);
+}
+
+.title {
+  margin: 0.75rem 0 0;
+  font-size: 2.25rem;
+  line-height: 1.2;
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-block;
+  margin-top: 1.25rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  background: var(--afiliados-primary-soft);
+  color: var(--afiliados-primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.description {
+  margin-top: 1.5rem;
+  font-size: 1rem;
+  color: var(--afiliados-muted);
+}
+
+.meta {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--afiliados-border);
+  border-radius: 8px;
+  background: var(--afiliados-background);
+  text-align: left;
+}
+
+.metaRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.metaRow + .metaRow {
+  margin-top: 0.5rem;
+}
+
+.metaKey {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--afiliados-muted);
+}
+
+.metaValue {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8125rem;
+  color: var(--afiliados-foreground);
+  overflow-wrap: anywhere;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+  color: var(--afiliados-foreground);
+}
+
+.statusDot {
+  width: 0.5rem;
+  height: 0.5rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--afiliados-primary);
+}
+
+.note {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--afiliados-border);
+  font-size: 0.875rem;
+  color: var(--afiliados-muted);
+}
