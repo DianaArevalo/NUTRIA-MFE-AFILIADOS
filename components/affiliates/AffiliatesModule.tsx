@@ -18,16 +18,20 @@ export const MODULE_ID = "./Afiliados";
 export type AffiliatesModuleProps = {
   /** Nombre del Remote que publica el modulo. */
   remoteName?: string;
+
+  /** Title provided by the Host application. */
+  title?: string;
 };
 
 export default function AffiliatesModule({
   remoteName = REMOTE_NAME,
+  title = "Afiliados",
 }: AffiliatesModuleProps) {
   return (
     <section className={styles.card} data-remote={remoteName} data-module={MODULE_ID}>
       <p className={styles.brand}>NUTRIA</p>
 
-      <h1 className={styles.title}>Afiliados</h1>
+      <h1 className={styles.title}>{title}</h1>
 
       <p className={styles.badge}>Modulo federado</p>
 
